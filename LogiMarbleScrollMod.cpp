@@ -8,6 +8,7 @@
 LRESULT CALLBACK targetWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 bool scrollingActive = false;
+POINT scrollingCursorPos;
 
 int main()
 {
@@ -16,7 +17,7 @@ int main()
     WNDCLASS wc = {};
     wc.lpfnWndProc = targetWindowProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = TEXT("SmoothMouseScroll");
+    wc.lpszClassName = TEXT("LogiMarbleScrollMod");
 
     if (!RegisterClass(&wc))
         return -1;
@@ -29,7 +30,7 @@ int main()
     RAWINPUTDEVICE rid = {};
     rid.usUsagePage = 0x01; //Mouse
     rid.usUsage = 0x02;
-    rid.dwFlags = RIDEV_INPUTSINK;
+    rid.dwFlags = RIDEV_INPUTSINK | RIDEV_NOLEGACY | RIDEV_CAPTUREMOUSE | RIDEV_EXINPUTSINK;
     rid.hwndTarget = targetWindow;
 
     if (!RegisterRawInputDevices(&rid, 1, sizeof(rid)))
@@ -44,12 +45,6 @@ int main()
 
     DestroyWindow(targetWindow);
 
-    /// <summary>
-    ///  Actually scroll!
-    /// </summary>
-    /// <returns></returns>
-    mouse_event(MOUSEEVENTF_WHEEL, 0, 0, 1 * 120, 0);
-
     return 0;
 }
 
@@ -57,7 +52,6 @@ LRESULT CALLBACK targetWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 {
     switch (uMsg)
     {
-        // print out the values that I need
     case WM_INPUT: {
         UINT dataSize;
         GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, NULL, &dataSize, sizeof(RAWINPUTHEADER)); //Need to populate data size first
@@ -74,20 +68,21 @@ LRESULT CALLBACK targetWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
                     switch (raw->data.mouse.ulButtons)
                     {
                     case SCROLLMOUSEDOWN:
-                        scrollingActive = true; break;
+                        scrollingActive = true;
+                        GetCursorPos(&scrollingCursorPos);
+                        break;
                     case SCROLLMOUSEUP:
                         scrollingActive = false; break;
                     }
 
                     if (scrollingActive) {
-                        //std::cout << raw->data.mouse.lLastY << std::endl;
                         mouse_event(MOUSEEVENTF_WHEEL, 0, 0, raw->data.mouse.lLastY, 0);
-                        return 1;
+                        SetCursorPos(scrollingCursorPos.x, scrollingCursorPos.y);
+                        return 0;
                     }
                 }
             }
         }
-        return 0;
     }
     }
 
